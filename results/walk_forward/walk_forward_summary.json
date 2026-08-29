@@ -1,0 +1,16 @@
+[
+    {
+        "model": "XGBoost",
+        "accuracy": 0.433337,
+        "precision": 0.423439,
+        "recall": 0.433337,
+        "f1_score": 0.39913
+    },
+    {
+        "model": "Logistic Regression",
+        "accuracy": 0.450128,
+        "precision": 0.433911,
+        "recall": 0.450128,
+        "f1_score": 0.385633
+    }
+]

@@ -1,0 +1,23 @@
+[
+    {
+        "Model":"Logistic Regression",
+        "Accuracy":46.9215291751,
+        "Precision":43.9799132883,
+        "Recall":46.9215291751,
+        "F1 Score":41.0726771252
+    },
+    {
+        "Model":"XGBoost",
+        "Accuracy":44.8088531187,
+        "Precision":43.3127088035,
+        "Recall":44.8088531187,
+        "F1 Score":42.5823754354
+    },
+    {
+        "Model":"LSTM",
+        "Accuracy":47.2536687631,
+        "Precision":44.0370378166,
+        "Recall":47.2536687631,
+        "F1 Score":42.8581131658
+    }
+]
