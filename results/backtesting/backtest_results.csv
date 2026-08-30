@@ -1,4 +1,4 @@
 Strategy,Total Return (%),Annualized Return (%),Sharpe Ratio,Max Drawdown (%),Win Rate (%),Trading Periods
-Logistic Regression,92.0,39.2,1.164,-30.18,45.88,497
-XGBoost,39.11,18.22,0.72,-38.05,51.91,497
+Logistic Regression,6.24,3.12,0.256,-37.28,42.66,497
+XGBoost,-23.93,-12.95,-0.329,-56.14,49.3,497
 Equal Weight Benchmark,95.8,40.69,1.541,-25.56,56.85,496
