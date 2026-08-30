@@ -254,6 +254,52 @@ def explain_model():
 
 
 # ============================================================
+# EQUITY CURVE ENDPOINT (time series for charting)
+# ============================================================
+
+@app.get("/equity-curve")
+def get_equity_curve():
+
+    files = {
+        "Logistic Regression": "logistic_daily_returns.csv",
+        "XGBoost": "xgboost_daily_returns.csv",
+        "Equal Weight Benchmark": "benchmark_daily_returns.csv",
+    }
+
+    series = {}
+
+    for label, filename in files.items():
+        path = os.path.join(RESULTS_DIR, "backtesting", filename)
+
+        if not os.path.exists(path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Equity curve data not found: {filename}"
+            )
+
+        df = pd.read_csv(path)[["Date", "Equity"]].rename(
+            columns={"Equity": label}
+        )
+        series[label] = df
+
+    # Inner-join on Date so every row has a value for every strategy —
+    # some strategies can have one fewer trading day than others (e.g. if
+    # a ticker was missing data on the final date), and a naive outer join
+    # would leave NaN gaps that break JSON parsing on the frontend.
+    combined = None
+    for df in series.values():
+        combined = df if combined is None else combined.merge(df, on="Date", how="inner")
+
+    combined = combined.sort_values("Date").reset_index(drop=True)
+
+    return {
+        "data_start": combined["Date"].iloc[0],
+        "data_end": combined["Date"].iloc[-1],
+        "points": combined.to_dict(orient="records"),
+    }
+
+
+# ============================================================
 # ROOT ENDPOINT
 # ============================================================
 
@@ -267,6 +313,7 @@ def root():
             "/predict",
             "/compare",
             "/backtest",
+            "/equity-curve",
             "/explain"
         ]
     }

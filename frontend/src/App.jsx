@@ -1,15 +1,33 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import "./App.css";
 
 const API = "http://127.0.0.1:8000";
+
+const STRATEGY_COLORS = {
+  "Logistic Regression": "#e8a33d",
+  "XGBoost": "#5b9bd5",
+  "Equal Weight Benchmark": "#7a8290",
+};
 
 function App() {
   const [comparison, setComparison] = useState([]);
   const [backtest, setBacktest] = useState([]);
   const [explain, setExplain] = useState([]);
+  const [equityCurve, setEquityCurve] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -18,17 +36,21 @@ function App() {
   async function loadData() {
     try {
       setLoading(true);
+      setError("");
 
-      const [comparisonRes, backtestRes, explainRes] =
+      const [comparisonRes, backtestRes, explainRes, equityRes] =
         await Promise.all([
           axios.get(`${API}/compare`),
           axios.get(`${API}/backtest`),
           axios.get(`${API}/explain`),
+          axios.get(`${API}/equity-curve`),
         ]);
 
       setComparison(comparisonRes.data);
       setBacktest(backtestRes.data);
       setExplain(explainRes.data.feature_importance);
+      setEquityCurve(equityRes.data);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error(err);
       setError(
@@ -41,162 +63,305 @@ function App() {
 
   if (loading) {
     return (
-      <div className="center">
-        <h2>Loading Stock Market ML Dashboard...</h2>
+      <div className="statusScreen">
+        <div className="pulseDot" />
+        <p className="mono">LOADING RESEARCH DATA…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="center">
-        <h2>Connection Error</h2>
-        <p>{error}</p>
-        <button onClick={loadData}>Try Again</button>
+      <div className="statusScreen">
+        <p className="mono errorLabel">CONNECTION ERROR</p>
+        <p className="errorMessage">{error}</p>
+        <button className="btnPrimary" onClick={loadData}>
+          Retry Connection
+        </button>
       </div>
     );
   }
 
+  const bestModel = [...comparison].sort(
+    (a, b) => b["F1 Score"] - a["F1 Score"]
+  )[0];
+
   return (
     <div className="app">
+      {/* Status strip — the whole point: this tells you plainly it's static research, not a live feed */}
+      <div className="statusStrip">
+        <div className="statusStripInner">
+          <div className="statusItem">
+            <span className="statusDotStatic" />
+            <span className="mono statusLabel">
+              DATA MODE — HISTORICAL / STATIC BACKTEST
+              {equityCurve &&
+                ` · COVERS ${equityCurve.data_start} → ${equityCurve.data_end}`}
+            </span>
+          </div>
+          <div className="statusItem statusItemRight">
+            <span className="mono statusLabel">
+              {lastUpdated
+                ? `LAST LOADED ${lastUpdated.toLocaleTimeString()}`
+                : ""}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <header>
+      <header className="header">
         <div>
-          <h1>Stock Market ML Dashboard</h1>
-          <p>
-            Machine Learning Based Stock Movement Prediction and Backtesting
+          <p className="mono eyebrow">QUANT RESEARCH TERMINAL</p>
+          <h1 className="title">Alpha Signal</h1>
+          <p className="subtitle">
+            ML-based equity movement prediction, walk-forward validated,
+            backtested net of transaction costs
           </p>
         </div>
-
-        <button onClick={loadData}>
+        <button className="btnPrimary" onClick={loadData}>
           Refresh Data
         </button>
       </header>
 
+      {/* MODEL COMPARISON */}
+      <section className="section">
+        <div className="sectionHeading">
+          <h2>Model Comparison</h2>
+          <p className="sectionSub">Held-out test performance, by model</p>
+        </div>
 
-      <section>
-        <h2>Model Comparison</h2>
-
-        <div className="cards">
+        <div className="cardGrid">
           {comparison.map((model) => (
-            <div className="card" key={model.Model}>
-              <h3>{model.Model}</h3>
-
-              <div className="metric">
-                <span>Accuracy</span>
-                <strong>{model.Accuracy.toFixed(2)}%</strong>
+            <div
+              className={
+                "modelCard" +
+                (model.Model === bestModel?.Model ? " modelCardBest" : "")
+              }
+              key={model.Model}
+            >
+              <div className="modelCardHead">
+                <h3>{model.Model}</h3>
+                {model.Model === bestModel?.Model && (
+                  <span className="badge">BEST F1</span>
+                )}
               </div>
 
-              <div className="metric">
-                <span>F1 Score</span>
-                <strong>{model["F1 Score"].toFixed(2)}%</strong>
+              <div className="metricRow">
+                <span className="metricLabel">Accuracy</span>
+                <span className="metricValue mono">
+                  {model.Accuracy.toFixed(2)}%
+                </span>
               </div>
-
-              <div className="metric">
-                <span>Precision</span>
-                <strong>{model.Precision.toFixed(2)}%</strong>
+              <div className="metricRow">
+                <span className="metricLabel">F1 Score</span>
+                <span className="metricValue mono">
+                  {model["F1 Score"].toFixed(2)}%
+                </span>
+              </div>
+              <div className="metricRow">
+                <span className="metricLabel">Precision</span>
+                <span className="metricValue mono">
+                  {model.Precision.toFixed(2)}%
+                </span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
+      {/* EQUITY CURVE */}
+      <section className="section">
+        <div className="sectionHeading">
+          <h2>Equity Curve</h2>
+          <p className="sectionSub">
+            Portfolio value over time, starting at 1.0 — net of transaction
+            costs, {equityCurve?.data_start} to {equityCurve?.data_end}
+          </p>
+        </div>
 
-      <section>
-        <h2>Backtesting Performance</h2>
+        <div className="chartCard">
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={equityCurve?.points || []}>
+              <CartesianGrid stroke="#1d2128" vertical={false} />
+              <XAxis
+                dataKey="Date"
+                tick={{ fill: "#7a8290", fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                tickLine={false}
+                axisLine={{ stroke: "#262b33" }}
+                minTickGap={60}
+              />
+              <YAxis
+                tick={{ fill: "#7a8290", fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                tickLine={false}
+                axisLine={{ stroke: "#262b33" }}
+                tickFormatter={(v) => v.toFixed(2)}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "#14171c",
+                  border: "1px solid #262b33",
+                  borderRadius: 6,
+                  fontFamily: "IBM Plex Mono",
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "#7a8290" }}
+                formatter={(value) => value.toFixed(4)}
+              />
+              <Legend
+                wrapperStyle={{
+                  fontSize: 12,
+                  fontFamily: "IBM Plex Sans",
+                  paddingTop: 12,
+                }}
+              />
+              {Object.keys(STRATEGY_COLORS).map((key) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  stroke={STRATEGY_COLORS[key]}
+                  strokeWidth={key === "Equal Weight Benchmark" ? 1.5 : 2}
+                  strokeDasharray={
+                    key === "Equal Weight Benchmark" ? "4 3" : undefined
+                  }
+                  dot={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
 
-        <div className="table-container">
-          <table>
+      {/* BACKTEST */}
+      <section className="section">
+        <div className="sectionHeading">
+          <h2>Backtesting Performance</h2>
+          <p className="sectionSub">
+            Net of assumed transaction costs — compared against an
+            equal-weight benchmark, not a strawman
+          </p>
+        </div>
+
+        <div className="tableWrap">
+          <table className="dataTable">
             <thead>
               <tr>
                 <th>Strategy</th>
-                <th>Total Return</th>
-                <th>Annualized Return</th>
-                <th>Sharpe Ratio</th>
-                <th>Max Drawdown</th>
-                <th>Win Rate</th>
+                <th className="num">Total Return</th>
+                <th className="num">Annualized</th>
+                <th className="num">Sharpe</th>
+                <th className="num">Max Drawdown</th>
+                <th className="num">Win Rate</th>
               </tr>
             </thead>
-
             <tbody>
-              {backtest.map((item) => (
-                <tr key={item.Strategy}>
-                  <td>{item.Strategy}</td>
-                  <td>{item["Total Return (%)"]}%</td>
-                  <td>{item["Annualized Return (%)"]}%</td>
-                  <td>{item["Sharpe Ratio"]}</td>
-                  <td>{item["Max Drawdown (%)"]}%</td>
-                  <td>{item["Win Rate (%)"]}%</td>
-                </tr>
-              ))}
+              {backtest.map((item) => {
+                const isBenchmark = item.Strategy
+                  .toLowerCase()
+                  .includes("benchmark");
+                const totalReturn = item["Total Return (%)"];
+                const sharpe = item["Sharpe Ratio"];
+                return (
+                  <tr
+                    key={item.Strategy}
+                    className={isBenchmark ? "benchmarkRow" : ""}
+                  >
+                    <td className="strategyCell">
+                      {item.Strategy}
+                      {isBenchmark && (
+                        <span className="benchmarkTag">BENCHMARK</span>
+                      )}
+                    </td>
+                    <td className={`num mono ${totalReturn >= 0 ? "pos" : "neg"}`}>
+                      {totalReturn >= 0 ? "+" : ""}
+                      {totalReturn}%
+                    </td>
+                    <td className="num mono">
+                      {item["Annualized Return (%)"]}%
+                    </td>
+                    <td className={`num mono ${sharpe >= 0 ? "pos" : "neg"}`}>
+                      {sharpe}
+                    </td>
+                    <td className="num mono neg">
+                      {item["Max Drawdown (%)"]}%
+                    </td>
+                    <td className="num mono">{item["Win Rate (%)"]}%</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </section>
 
+      {/* SHAP EXPLAINABILITY */}
+      <section className="section">
+        <div className="sectionHeading">
+          <h2>Model Explainability</h2>
+          <p className="sectionSub">
+            SHAP mean absolute feature importance — XGBoost
+          </p>
+        </div>
 
-      <section>
-        <h2>AI Model Explainability</h2>
-        <p className="subtitle">
-          SHAP Feature Importance for XGBoost
-        </p>
-
-        <div className="feature-list">
-          {explain.slice(0, 10).map((item) => {
+        <div className="featureList">
+          {explain.slice(0, 10).map((item, i) => {
             const maxValue = explain[0]?.Mean_Absolute_SHAP || 1;
-
-            const width =
-              (item.Mean_Absolute_SHAP / maxValue) * 100;
-
+            const width = (item.Mean_Absolute_SHAP / maxValue) * 100;
             return (
-              <div className="feature" key={item.Feature}>
-                <div className="feature-header">
-                  <span>{item.Feature}</span>
-
-                  <strong>
-                    {item.Mean_Absolute_SHAP.toFixed(4)}
-                  </strong>
-                </div>
-
-                <div className="bar-background">
+              <div className="featureRow" key={item.Feature}>
+                <span className="mono featureRank">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="featureName">{item.Feature}</span>
+                <div className="featureBarTrack">
                   <div
-                    className="bar"
+                    className="featureBarFill"
                     style={{ width: `${width}%` }}
-                  ></div>
+                  />
                 </div>
+                <span className="mono featureValue">
+                  {item.Mean_Absolute_SHAP.toFixed(4)}
+                </span>
               </div>
             );
           })}
         </div>
       </section>
 
+      {/* RESEARCH NOTE — answers "is this live / is this financial advice" directly */}
+      <section className="section">
+        <div className="researchNote">
+          <p className="mono researchNoteLabel">RESEARCH NOTE</p>
+          <p>
+            This dashboard reflects a historical backtest, not a live trading
+            signal. Predictions are generated from a fixed, walk-forward
+            validated model trained on past data — nothing here updates in
+            real time, and nothing here is investment advice. The value of
+            this project is the rigor of the validation methodology, not a
+            claim that it beats the market.
+          </p>
+        </div>
 
-      <section className="project-summary">
-        <h2>Project Summary</h2>
-
-        <div className="summary-grid">
-          <div>
-            <strong>Models</strong>
-            <p>Logistic Regression, XGBoost, LSTM</p>
+        <div className="summaryGrid">
+          <div className="summaryItem">
+            <span className="mono summaryLabel">MODELS</span>
+            <p>Logistic Regression · XGBoost · LSTM</p>
           </div>
-
-          <div>
-            <strong>Validation</strong>
-            <p>Time-Based Split + Walk-Forward Validation</p>
+          <div className="summaryItem">
+            <span className="mono summaryLabel">VALIDATION</span>
+            <p>Walk-forward, time-based splits — no lookahead bias</p>
           </div>
-
-          <div>
-            <strong>Explainability</strong>
-            <p>SHAP Feature Importance</p>
+          <div className="summaryItem">
+            <span className="mono summaryLabel">EXPLAINABILITY</span>
+            <p>SHAP feature importance</p>
           </div>
-
-          <div>
-            <strong>Backtesting</strong>
-            <p>Portfolio-Level Strategy Evaluation</p>
+          <div className="summaryItem">
+            <span className="mono summaryLabel">BACKTESTING</span>
+            <p>Portfolio-level, net of transaction costs</p>
           </div>
         </div>
       </section>
-
     </div>
   );
 }
