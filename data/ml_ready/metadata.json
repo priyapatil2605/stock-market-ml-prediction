@@ -1,0 +1,31 @@
+{
+    "features":[
+        "daily_return",
+        "return_lag_1",
+        "return_lag_2",
+        "return_lag_3",
+        "return_lag_5",
+        "return_lag_10",
+        "price_vs_sma_10",
+        "price_vs_sma_20",
+        "price_vs_sma_50",
+        "ma_10_20_ratio",
+        "rsi_14",
+        "macd",
+        "macd_signal",
+        "macd_hist",
+        "bb_width",
+        "bb_position",
+        "volatility_10",
+        "volatility_20",
+        "atr_14",
+        "volume_ratio"
+    ],
+    "split_date":"2024-01-01",
+    "train_rows":12090,
+    "test_rows":4970,
+    "train_start":"2019-03-14",
+    "train_end":"2023-12-29",
+    "test_start":"2024-01-02",
+    "test_end":"2025-12-23"
+}

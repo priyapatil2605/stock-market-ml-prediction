@@ -35,6 +35,17 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 # ============================================================
+# TRANSACTION COSTS
+# ============================================================
+# Assumed round-trip cost per trade, in basis points. 10 bps (0.10%) is a
+# reasonable estimate for liquid large-cap equities covering brokerage +
+# bid-ask spread + slippage. Tune this per market/broker if you have real
+# numbers. This is charged proportionally to daily portfolio turnover, not
+# as a flat fee per period, so it scales with how much the strategy trades.
+TRANSACTION_COST_BPS = 10
+
+
+# ============================================================
 # PERFORMANCE METRICS
 # ============================================================
 
@@ -159,23 +170,28 @@ def create_next_day_returns(df):
 # CREATE STRATEGY PORTFOLIO RETURNS
 # ============================================================
 
-def create_strategy_returns(df, signal_column):
+def create_strategy_returns(df, signal_column, transaction_cost_bps=TRANSACTION_COST_BPS):
 
     """
-    Daily rebalanced portfolio.
+    Daily rebalanced portfolio, net of transaction costs.
 
     For each date:
 
     1. Select stocks predicted as UP
     2. Equally weight selected stocks
-    3. Calculate average NEXT-DAY return
+    3. Calculate average NEXT-DAY return (gross)
+    4. Compute turnover vs yesterday's holdings (tickers entered + exited,
+       relative to portfolio size) and subtract a proportional cost
+       (transaction_cost_bps applied to the turnover fraction)
 
     If no stock is predicted UP:
     Portfolio stays in cash.
-    Return = 0
+    Gross return = 0 (no cost either, since nothing traded to get to cash
+    beyond exiting prior positions, which IS captured in turnover)
     """
 
     strategy_results = []
+    previous_tickers = set()
 
     for date, group in df.groupby("Date"):
 
@@ -187,9 +203,11 @@ def create_strategy_returns(df, signal_column):
             subset=["next_day_return"]
         )
 
+        current_tickers = set(selected_stocks["Ticker"])
+
         if len(selected_stocks) > 0:
 
-            portfolio_return = (
+            gross_return = (
                 selected_stocks[
                     "next_day_return"
                 ].mean()
@@ -201,8 +219,20 @@ def create_strategy_returns(df, signal_column):
 
         else:
 
-            portfolio_return = 0
+            gross_return = 0
             number_positions = 0
+
+        # Turnover = fraction of the portfolio that changed today
+        # (positions opened + positions closed) relative to portfolio size.
+        # A full flip from one set of names to a completely different set
+        # of the same size gives turnover = 1.0 (100%).
+        entered = current_tickers - previous_tickers
+        exited = previous_tickers - current_tickers
+        denom = max(len(current_tickers), len(previous_tickers), 1)
+        turnover = (len(entered) + len(exited)) / denom
+
+        cost = turnover * (transaction_cost_bps / 10000)
+        net_return = gross_return - cost
 
         strategy_results.append({
 
@@ -210,11 +240,22 @@ def create_strategy_returns(df, signal_column):
                 date,
 
             "Return":
-                portfolio_return,
+                net_return,
+
+            "GrossReturn":
+                gross_return,
+
+            "Turnover":
+                turnover,
+
+            "Cost":
+                cost,
 
             "Positions":
                 number_positions
         })
+
+        previous_tickers = current_tickers
 
     return pd.DataFrame(
         strategy_results
@@ -531,11 +572,22 @@ def main():
     ])
 
 
+    total_logistic_cost = logistic_df["Cost"].sum() * 100
+    total_xgboost_cost = xgboost_df["Cost"].sum() * 100
+
+    print(
+        f"\nAssumed transaction cost: {TRANSACTION_COST_BPS} bps per unit turnover"
+    )
+    print(
+        f"Total cost drag over period — Logistic Regression: "
+        f"{total_logistic_cost:.2f}% | XGBoost: {total_xgboost_cost:.2f}%"
+    )
+
     print("\n")
 
     print("=" * 90)
 
-    print("CORRECTED BACKTEST RESULTS")
+    print("BACKTEST RESULTS (net of transaction costs)")
 
     print("=" * 90)
 
