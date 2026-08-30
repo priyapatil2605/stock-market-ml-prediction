@@ -1,84 +1,142 @@
-# Vibe Closet
+# Stock Market Movement Prediction using Machine Learning
 
-A personal styling app that recommends outfits from your own wardrobe based on aesthetic/vibe (Old Money, Y2K, Streetwear, Clean Girl, Italian Coastal, Minimalist), with basic fit and sustainability guidance.
-
-> Status: early build. Frontend mockup complete with static data. Backend, database, and ML matching are in progress.
+A machine learning-based stock market prediction system that predicts short-term stock movement using technical indicators, compares multiple ML models, performs walk-forward validation, evaluates trading strategies through portfolio-level backtesting, and explains XGBoost predictions using SHAP.
 
 ---
 
-## Why this project
+## Project Overview
 
-Most fashion apps solve one problem in isolation — a closet organizer, a virtual try-on tool, or a size guide — but rarely combine them. Vibe Closet's goal is to bring wardrobe management, aesthetic-based outfit recommendation, and basic fit/sustainability info into a single simple flow, without the complexity (or cost) of a full virtual try-on system.
+This project builds an end-to-end machine learning pipeline for stock market movement prediction.
 
----
+The system performs:
 
-## Features
+- Historical stock data collection
+- Data cleaning and preprocessing
+- Technical indicator generation
+- Target label creation
+- Logistic Regression training
+- XGBoost training
+- LSTM sequence modeling
+- Time-based train-test splitting
+- Walk-forward validation
+- Portfolio-level backtesting
+- Model comparison
+- SHAP explainability
+- FastAPI backend
+- React dashboard
 
-### 1. Wardrobe
-Upload and organize your clothing items with tags for category, color, occasion, and season. This is the core data every other feature builds on.
-
-### 2. Vibe / Aesthetic Matching
-Pick a style identity — Old Money, Y2K, Streetwear, Clean Girl, Italian Coastal, Minimalist — and get outfit suggestions styled to that aesthetic using items you actually own.
-
-### 3. Outfit Generator
-Combines wardrobe items by category (top / bottom / shoes / accessories) filtered by selected vibe and occasion into a ready-to-wear outfit suggestion.
-
-### 4. Size / Fit Checker
-A simple brand-based lookup that tells you whether a brand tends to run small, true-to-size, or large for a given category, to reduce fit guesswork before buying.
-
-### 5. Sustainability Tags
-Each wardrobe item gets a rough sustainability rating (high / medium / low) based on its listed material, so users can see the environmental footprint of their closet at a glance.
-
----
-
-## Tech Stack
-
-| Layer | Tech |
-|---|---|
-| Frontend (web) | React |
-| Frontend (mobile) | React Native *(planned)* |
-| Backend | Node.js + Express |
-| Database | MongoDB |
-| Image storage | Cloudinary |
-| Vibe matching (ML) | CLIP embeddings + cosine similarity *(planned)* |
-| Hosting | Vercel (frontend), Render (backend) *(planned)* |
+The objective is not only to build predictive models, but also to evaluate whether model predictions translate into useful investment performance.
 
 ---
 
-## Project Status
+# Project Architecture
 
-| Module | Status |
-|---|---|
-| Static UI mockup (all 5 features, fake data) | ✅ Done |
-| Backend server + routes | 🔲 Not started |
-| Database schema + connection | 🔲 Not started |
-| Wardrobe CRUD (real data) | 🔲 Not started |
-| Auth (signup/login) | 🔲 Not started |
-| Vibe matching via CLIP | 🔲 Not started |
-| Outfit generator (real logic) | 🔲 Not started |
-| Size checker (static lookup) | 🔲 Not started |
-| Sustainability tags (static lookup) | 🔲 Not started |
-| Mobile app | 🔲 Not started |
-| Deployment | 🔲 Not started |
+```text
+Stock Market Data
+       |
+       v
+Data Collection
+       |
+       v
+Data Cleaning
+       |
+       v
+Feature Engineering
+       |
+       v
+Target Generation
+       |
+       v
++-----------------------------+
+| Machine Learning Models     |
+|                             |
+| Logistic Regression         |
+| XGBoost                     |
+| LSTM                        |
++-----------------------------+
+       |
+       v
+Model Evaluation
+       |
+       +-------------------+
+       |                   |
+       v                   v
+Walk-Forward          SHAP Analysis
+Validation
+       |
+       v
+Portfolio Backtesting
+       |
+       v
+FastAPI Backend
+       |
+       v
+React Dashboard
+```
 
 ---
 
-## Planned Roadmap (v2 and beyond)
+## Setup
 
-These are intentionally out of scope for v1 due to complexity, but are natural next steps:
+```bash
+git clone https://github.com/priyapatil2605/stock-market-ml-prediction.git
+cd stock-market-ml-prediction
+pip install -r requirements.txt
 
-- **Virtual try-on** — overlay outfit combinations on a user photo using pose estimation / diffusion-based try-on models
-- **Trend prediction** — surface trending styles by analyzing social platforms and re-ranking outfit suggestions accordingly
-- **ML-based size prediction** — replace the static brand lookup with a model trained on user measurements and return data
+# Pull fresh data and rebuild everything (data/ and models/ are gitignored,
+# so you need to regenerate them locally)
+python src/data/data_pipeline.py
+python src/features/build_features.py      # adjust to your actual script names
+python src/models/train_models.py
+python src/models/walk_forward_validation.py
+python src/backtesting/run_backtest.py
+
+# Backend
+cd backend && uvicorn main:app --reload
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
 
 ---
 
-## Getting Started
+## Results & Interpretation
 
-*(To be filled in once the backend is set up — will include install steps, environment variables, and how to run locally.)*
+**Model comparison (held-out test set)**
+
+| Model | Accuracy | F1 (macro) |
+|---|---|---|
+| LSTM | 47.25% | 42.86% |
+| Logistic Regression | 46.92% | 41.07% |
+| XGBoost | 44.81% | 42.58% |
+
+**Walk-forward validation (rolling, chronological folds — no lookahead)**
+
+| Model | Accuracy | F1 (macro) |
+|---|---|---|
+| Logistic Regression | 45.01% | 38.56% |
+| XGBoost | 43.33% | 39.91% |
+
+Accuracy sits close to a 3-class random baseline (~33-45%), which is expected and honest for daily equity direction prediction — this isn't a data leak, it's what real market efficiency looks like.
+
+**Portfolio backtest, net of a 10 bps/turnover transaction cost assumption**
+
+| Strategy | Total Return | Ann. Return | Sharpe | Max Drawdown | Win Rate |
+|---|---|---|---|---|---|
+| Logistic Regression | 6.24% | 3.12% | 0.256 | -37.28% | 42.66% |
+| XGBoost | -23.93% | -12.95% | -0.329 | -56.14% | 49.30% |
+| Equal-Weight Benchmark | 95.80% | 40.69% | 1.541 | -25.56% | 56.85% |
+
+**Both strategies substantially underperform a simple equal-weight buy-and-hold benchmark once realistic transaction costs are included.** Daily rebalancing across a small universe (10 tickers) produces high turnover, and at an assumed 10 bps cost per unit of turnover this consumes 59-60% of gross returns over the backtest period.
+
+This is the expected, honest outcome of a leak-free pipeline — a pipeline with lookahead bias would show unrealistically strong returns. The value of this project is the rigor of the pipeline (walk-forward validation, no lookahead, realistic cost modeling), not a claim that it beats the market.
 
 ---
 
-## Author
+## Limitations
 
-Built by [Your Name], 3rd year Computer Science, as a full-stack + ML learning project.
+- Universe limited to 10 liquid large-cap tickers; results may not generalize to small caps or other asset classes
+- Transaction cost is a flat 10 bps/turnover assumption, not modeled per-ticker liquidity or actual bid-ask spreads
+- Daily bar data only — no intraday signals or execution modeling
+- No regime detection (bull/bear/sideways) — a single global model is used across the full period
+- Labeling threshold (forward return > X%) is a fixed global value, not tuned per ticker's typical volatility
